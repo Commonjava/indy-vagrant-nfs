@@ -1,9 +1,14 @@
 Vagrant.configure(2) do |config|
-  config.vm.define :testnfs do |testnfs|
-    testnfs.vm.box = "centos/7"
-    testnfs.vm.hostname = "test-nfs.local"
+  config.vm.define :nfs do |nfs|
+    nfs.vm.box = "centos/7"
+    nfs.vm.hostname = "nfs.local"
 
-    testnfs.vm.provision :shell, :path => 'provision.sh'
+    nfs.vm.provision :shell, :path => 'provision-nfs.sh'
+  end
+  config.vm.define :nfs do |client|
+    client.vm.box = "centos/7"
+    client.vm.hostname = "client.local"
 
+    client.vm.provision :shell, :path => 'provision-client.sh'
   end
 end
