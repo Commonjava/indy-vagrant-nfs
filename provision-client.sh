@@ -1,12 +1,30 @@
-yum install -y epel-release wget
+yum install -y epel-release wget java-1.8.0-openjdk-devel psmisc lsof
 yum update -y
+yum clean all
 
-cd /tmp
-wget http://repo.maven.apache.org/maven2/org/commonjava/indy/launch/indy-launcher-savant/1.1.5/indy-launcher-savant-1.1.5-launcher.tar.gz
-tar -zxvf /tmp/indy-launcher-savant-1.1.5-launcher.tar.gz -C /opt
+cat > /etc/systemd/system/indy.service << '__EOF__'
+[Unit]
+Description=Indy
 
-if [ ! -d /opt/indy/var/lib/indy/storage ]; then
-	mkdir -p /opt/indy/var/lib/indy/storage
-fi
+[Service]
+Restart=always
+RestartSec=10
+ExecStart=/bin/bash -l /vagrant/client/start-indy.sh
+ExecStop=/usr/bin/killall java
 
-mount -t nfs nfs.local:/exports/test /opt/indy/var/lib/indy/storage
+[Install]
+WantedBy=multi-user.target
+__EOF__
+
+systemctl daemon-reload
+
+systemctl disable firewalld
+systemctl stop firewalld
+
+# firewall-cmd --permanent --zone=public --add-port=8080/tcp
+# firewall-cmd --permanent --zone=public --add-port=8081/tcp
+# firewall-cmd --permanent --zone=public --add-port=8000/tcp
+# firewall-cmd --reload
+
+systemctl enable indy
+systemctl start indy
