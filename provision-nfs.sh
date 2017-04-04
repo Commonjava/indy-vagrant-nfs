@@ -1,6 +1,6 @@
 yum install -y epel-release
 yum update -y
-yum install -y python-pip
+yum install -y python-pip tcpdump
 yum clean all
 
 pip install --upgrade pip
