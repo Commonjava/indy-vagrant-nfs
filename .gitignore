@@ -2,3 +2,5 @@
 */venv
 */project
 *.pyc
+indy-overlay
+*/builds
