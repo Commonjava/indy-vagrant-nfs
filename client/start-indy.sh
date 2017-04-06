@@ -12,7 +12,7 @@ done
 
 INDY_URL=http://repo.maven.apache.org/maven2/org/commonjava/indy/launch/indy-launcher-savant/1.1.5/indy-launcher-savant-1.1.5-launcher.tar.gz
 MOUNT_OPTS='rw,relatime,vers=4.0,rsize=65536,wsize=65536,namlen=255,hard,proto=tcp,timeo=600,retrans=2,local_lock=none'
-USE_NFS='N'
+USE_NFS='Y'
 
 # if [ -f /vagrant/client/indy-info ]; then
 #     source /vagrant/client/indy-info

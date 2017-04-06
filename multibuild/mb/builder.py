@@ -99,21 +99,13 @@ class Builder(Thread):
 
                 self.build(builddir)
                 self.seal_folo_report(params)
-                self.reports.put((builddir,self.pull_folo_report(params)))
+                self.reports.put((builddir,params['url'], params['id']))
 
             except KeyboardInterrupt:
                 print "Keyboard interrupt in process: ", process_number
                 break
             finally:
                 self.queue.task_done()
-
-    def pull_folo_report(self, params):
-        """Pull the Folo tracking report associated with the current build"""
-
-        resp = requests.get("%(url)s/api/folo/admin/%(id)s/record" % params)
-        resp.raise_for_status()
-
-        return resp.json()
 
     def seal_folo_report(self, params):
         """Seal the Folo tracking report after the build completes"""
