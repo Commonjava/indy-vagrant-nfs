@@ -3,6 +3,7 @@ import requests
 import json
 from threading import Thread
 from urlparse import urlparse
+import time
 import mb
 
 SETTINGS = """
@@ -77,33 +78,42 @@ SETTINGS = """
 POST_HEADERS = {'content-type': 'application/json'}
 
 class Builder(Thread):
-    def __init__(self, queue):
+    def __init__(self, queue, reports):
         Thread.__init__(self)
         self.queue = queue
+        self.reports = reports
 
     def run(self):
         while True:
             try:
-                (builddir, indy_url, proxy_port) = self.queue.get()
+                (builddir, indy_url, proxy_port, delay) = self.queue.get()
 
                 parsed = urlparse(indy_url)
                 params = {'dir': builddir, 'url':indy_url, 'id': os.path.basename(builddir), 'host': parsed.hostname, 'port': parsed.port, 'proxy_port': proxy_port}
 
                 self.setup(builddir, params);
+
+                if delay > 0:
+                  print "Delay: %s seconds" % delay
+                  time.sleep(delay)
+
                 self.build(builddir)
                 self.seal_folo_report(params)
-                self.pull_folo_report(params)
+                self.reports.put((builddir,self.pull_folo_report(params)))
 
-                self.queue.task_done()
             except KeyboardInterrupt:
                 print "Keyboard interrupt in process: ", process_number
                 break
+            finally:
+                self.queue.task_done()
 
     def pull_folo_report(self, params):
         """Pull the Folo tracking report associated with the current build"""
 
         resp = requests.get("%(url)s/api/folo/admin/%(id)s/record" % params)
         resp.raise_for_status()
+
+        return resp.json()
 
     def seal_folo_report(self, params):
         """Seal the Folo tracking report after the build completes"""
@@ -112,7 +122,7 @@ class Builder(Thread):
         resp.raise_for_status()
 
     def build(self, builddir):
-        mb.run_cmd("mvn -f %(d)s/pom.xml -s %(d)s/settings.xml clean deploy" % {'d': builddir})
+        mb.run_cmd("mvn -f %(d)s/pom.xml -s %(d)s/settings.xml clean deploy 2>&1 | tee %(d)s/build.log" % {'d': builddir}, fail=False)
 
     def setup(self, builddir, params):
         """Create the hosted repo and group, then pull the Indy-generated Maven

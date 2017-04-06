@@ -5,6 +5,8 @@ yum clean all
 cat > /etc/systemd/system/indy.service << '__EOF__'
 [Unit]
 Description=Indy
+Wants=network-online.target
+After=network.target network-online.target
 
 [Service]
 Restart=always
