@@ -4,3 +4,4 @@
 *.pyc
 indy-overlay
 */builds
+indy.tar.gz*

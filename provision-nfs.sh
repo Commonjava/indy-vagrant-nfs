@@ -19,7 +19,9 @@ done
 
 cat > /etc/systemd/system/tcconfig.service << '__EOF__'
 [Unit]
-Description=TC Configuration
+Description=Network Configuration
+Wants=network-online.target
+After=network.target network-online.target
 
 [Service]
 Restart=always
