@@ -1,5 +1,6 @@
 proxy-port: 8081
 build:
+  project-dir: 'my-test-project-workdir'
   threads: 4
   builds: 8
 report:
