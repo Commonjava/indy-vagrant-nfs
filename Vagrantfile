@@ -7,19 +7,19 @@ Vagrant.configure(2) do |config|
 
     nfs.vm.network :private_network, :ip => '192.168.50.2', :netmask => '255.255.255.0', :gateway => '192.168.50.1'
   end
-  config.vm.define :client, :primary => true do |client|
-    client.vm.box = "centos/7"
-    client.vm.hostname = "client.local"
+  config.vm.define :indy, :primary => true do |indy|
+    indy.vm.box = "centos/7"
+    indy.vm.hostname = "indy.local"
 
-    client.vm.provision :shell, :path => 'provision-client.sh'
+    indy.vm.provision :shell, :path => 'provision-indy.sh'
 
-    client.vm.network :private_network, :ip => '192.168.50.3', :netmask => '255.255.255.0', :gateway => '192.168.50.1'
+    indy.vm.network :private_network, :ip => '192.168.50.3', :netmask => '255.255.255.0', :gateway => '192.168.50.1'
 
-    # client.vm.provider :virtualbox do |v|
+    # indy.vm.provider :virtualbox do |v|
     #   v.memory = 2048
     #   v.cpus = 4
     # end
-    client.vm.provider :libvirt do |libvirt|
+    indy.vm.provider :libvirt do |libvirt|
       libvirt.memory=2048
       libvirt.cpus=4
     end
