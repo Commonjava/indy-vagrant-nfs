@@ -2,6 +2,8 @@ yum install -y epel-release wget java-1.8.0-openjdk-devel psmisc lsof
 yum update -y
 yum clean all
 
+chown -R vagrant /vagrant
+
 cat > /etc/systemd/system/indy.service << '__EOF__'
 [Unit]
 Description=Indy
@@ -11,7 +13,7 @@ After=network.target network-online.target
 [Service]
 Restart=always
 RestartSec=10
-ExecStart=/bin/bash -l /vagrant/client/start-indy.sh
+ExecStart=/bin/bash -l /vagrant/indy-scripts/start-indy.sh
 ExecStop=/usr/bin/killall java
 
 [Install]

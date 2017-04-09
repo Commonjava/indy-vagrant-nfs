@@ -4,7 +4,7 @@ import json
 from threading import Thread
 from urlparse import urlparse
 import time
-import mb
+import mb.util
 
 SETTINGS = """
 <?xml version="1.0"?>
@@ -114,7 +114,7 @@ class Builder(Thread):
         resp.raise_for_status()
 
     def build(self, builddir):
-        mb.run_cmd("mvn -f %(d)s/pom.xml -s %(d)s/settings.xml clean deploy 2>&1 | tee %(d)s/build.log" % {'d': builddir}, fail=False)
+        mb.util.run_cmd("mvn -f %(d)s/pom.xml -s %(d)s/settings.xml clean deploy 2>&1 | tee %(d)s/build.log" % {'d': builddir}, fail=False)
 
     def setup(self, builddir, params):
         """Create the hosted repo and group, then pull the Indy-generated Maven
@@ -149,9 +149,6 @@ class Builder(Thread):
         print "POSTing: %s" % json.dumps(group, indent=2)
 
         resp = requests.post("%(url)s/api/admin/group" % params, json=group, headers=POST_HEADERS)
-        resp.raise_for_status()
-
-        resp = requests.get("%(url)s/mavdav/settings/group/settings-%(id)s.xml" % params)
         resp.raise_for_status()
 
         with open("%s/settings.xml" % builddir, 'w') as f:

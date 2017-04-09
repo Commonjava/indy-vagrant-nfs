@@ -5,3 +5,5 @@
 indy-overlay
 */builds
 indy.tar.gz*
+*.tar.gz
+*.egg-info

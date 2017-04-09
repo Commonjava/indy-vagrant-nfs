@@ -14,15 +14,15 @@ INDY_URL=http://repo.maven.apache.org/maven2/org/commonjava/indy/launch/indy-lau
 MOUNT_OPTS='rw,relatime,vers=4.0,rsize=65536,wsize=65536,namlen=255,hard,proto=tcp,timeo=600,retrans=2,local_lock=none'
 USE_NFS='Y'
 
-# if [ -f /vagrant/client/indy-info ]; then
-#     source /vagrant/client/indy-info
-# fi
+if [ -f /vagrant/indy-scripts/indy-info ]; then
+    source /vagrant/indy-scripts/indy-info
+fi
 
-if [ "x${USE_NFS}" = 'xY' ]; then
-    # Unmount the NFS volume to refresh it, just in case something has gone stale
-    if [ "x" != "x$(df | grep 192.168.50.2)" ]; then
-        umount /opt/indy/var/lib/indy
-    fi
+echo "USE_NFS = ${USE_NFS}"
+
+# Unmount the NFS volume to refresh it, just in case something has gone stale
+if [ "x" != "x$(df | grep 192.168.50.2)" ]; then
+    umount /opt/indy/var/lib/indy
 fi
 
 rm -rf /opt/indy
@@ -74,10 +74,12 @@ INDY_LOGS=/opt/indy/var/log/indy
 rm -rf $INDY_LOGS
 
 # Try to divert Indy logs to a place that won't be removed on restart
-if [ ! -d /var/log/indy ]; then
-    mkdir /var/log/indy
-    chown -R vagrant /var/log/indy
-fi
+for d in /opt/indy/var/log /var/log/indy; do
+    if [ ! -d $d ]; then
+        mkdir $d
+        chown -R vagrant $d
+    fi
+done
 
 ln -s /var/log/indy $INDY_LOGS
 
