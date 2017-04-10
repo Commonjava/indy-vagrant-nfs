@@ -7,6 +7,7 @@ import mb.builder
 import mb.reporter
 from Queue import Queue
 import time
+from datetime import datetime as dt
 import requests
 
 @click.command()
@@ -18,10 +19,7 @@ def build(testfile, indy_url, delay, vagrant_dir):
     with open(testfile) as f:
         build_config = yaml.safe_load(f)
 
-    if vagrant_dir is not None:
-        vagrant_dir = os.path.abspath(vagrant_dir)
-    else:
-        vagrant_dir = os.path.abspath(os.getcwd())
+    vagrant_dir = mb.vagrant.find_vagrant_dir(vagrant_dir)
 
     if delay is None:
         delay = 0
@@ -31,6 +29,9 @@ def build(testfile, indy_url, delay, vagrant_dir):
     cwd = os.getcwd()
     try:
         project_dir = os.path.abspath(os.path.dirname(testfile))
+        builds_dir = "builds-" % dt.now().strftime("%Y%m%dT%H%M%S")
+
+        tid_base = os.path.basename(project_dir)
 
         mb.vagrant.init_ssh_config(vagrant_dir)
         mb.vagrant.vagrant_env(build_config, 'pre-build', indy_url, vagrant_dir, project_dir)
@@ -53,7 +54,7 @@ def build(testfile, indy_url, delay, vagrant_dir):
                 thread.start()
 
             for x in range(build['builds']):
-                builddir = mb.util.setup_builddir(project_src_dir, x)
+                builddir = mb.util.setup_builddir(builds_dir, project_src_dir, tid_base, x)
                 build_queue.put((builddir, indy_url, build_config['proxy-port'], (x % int(build['threads']))*int(delay)))
 
             build_queue.join()
@@ -80,8 +81,7 @@ def check(testfile, indy_url, vagrant_dir=None):
     with open(testfile) as f:
         build_config = yaml.safe_load(f)
 
-    if vagrant_dir is not None:
-        vagrant_dir = os.path.abspath(vagrant_dir)
+    vagrant_dir = mb.vagrant.find_vagrant_dir(vagrant_dir)
 
     cwd = os.getcwd()
     try:
@@ -100,8 +100,8 @@ def check(testfile, indy_url, vagrant_dir=None):
             task_ids = mb.reporter.get_sealed_reports(indy_url)
             print "\n".join(task_ids)
 
-            if not os.path.isdir('builds'):
-                os.makedirs('builds')
+            if not os.path.isdir('reports'):
+                os.makedirs('reports')
 
             for t in range(int(report['threads'])):
                 thread = mb.reporter.Reporter(report_queue)
@@ -109,7 +109,7 @@ def check(testfile, indy_url, vagrant_dir=None):
                 thread.start()
 
             for tid in task_ids:
-                builddir = "builds/%s" % tid
+                builddir = "reports/%s" % tid
                 if not os.path.isdir(builddir):
                     os.makedirs(builddir)
 

@@ -3,6 +3,22 @@ import requests
 import time
 import mb.util
 
+def find_vagrant_dir(vagrant_dir):
+    if vagrant_dir is not None:
+        vagrant_dir = os.path.abspath(vagrant_dir)
+    else:
+        vagrant_dir = os.path.abspath(os.getcwd())
+        while vagrant_dir is not None:
+            if os.path.isdir(os.path.join(vagrant_dir, '.vagrant')):
+                break
+            vagrant_dir = os.path.dirname(vagrant_dir)
+
+    if vagrant_dir is None:
+        print "Cannot find vagrant root directory (containing .vagrant subdirectory). Quitting."
+        exit(3)
+
+    return vagrant_dir
+
 def init_ssh_config(vagrant_dir):
     old_dir = os.getcwd()
     try:

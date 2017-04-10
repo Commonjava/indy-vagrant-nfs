@@ -14,11 +14,11 @@ def run_cmd(cmd, fail=True):
             raise Exception("Failed to run: '%s' (return value: %s)" % (cmd, ret))
 
 
-def setup_builddir(projectdir, idx):
-    if os.path.isdir('builds') is False:
-        os.makedirs('builds')
+def setup_builddir(builds_dir, projectdir, tid_base, idx):
+    if os.path.isdir(builds_dir) is False:
+        os.makedirs(builds_dir)
 
-    builddir="builds/project-%s-%s" % ((dt.now()-dt.utcfromtimestamp(0)).total_seconds(), idx)
+    builddir="%s/%s-%s-%s" % (builds_dir, tid_base, dt.now().strftime("%Y%m%dT%H%M%S"), idx)
 
     run_cmd("git clone file://%s %s" % (projectdir, builddir))
     
