@@ -29,7 +29,7 @@ def build(testfile, indy_url, delay, vagrant_dir):
     cwd = os.getcwd()
     try:
         project_dir = os.path.abspath(os.path.dirname(testfile))
-        builds_dir = "builds-" % dt.now().strftime("%Y%m%dT%H%M%S")
+        builds_dir = "builds-%s" % dt.now().strftime("%Y%m%dT%H%M%S")
 
         tid_base = os.path.basename(project_dir)
 
