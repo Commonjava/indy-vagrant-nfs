@@ -3,6 +3,14 @@ import requests
 import time
 import mb.util
 
+def init_ssh_config(vagrant_dir):
+    old_dir = os.getcwd()
+    try:
+        os.chdir(vagrant_dir)
+        mb.util.run_cmd("vagrant ssh-config > .vagrant/ssh-config", fail=True)
+    finally:
+        os.chdir(old_dir)
+
 def wait_for_indy(indy_url):
     max_tries=30
     ready = False
@@ -38,8 +46,6 @@ def run_vagrant_commands(section, indy_url):
 def run_vagrant_copy_ops(section, project_dir):
     copy_ops = section.get('copy')
     if copy_ops is not None:
-        mb.util.run_cmd("vagrant ssh-config > .vagrant/ssh-config", fail=True)
-
         for src in copy_ops:
             dest = copy_ops[src]
             mb.util.run_cmd(("scp -q -r -F .vagrant/ssh-config %s %s" % (src, dest)).format(project_dir=project_dir), fail=True)

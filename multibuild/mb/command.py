@@ -9,23 +9,30 @@ from Queue import Queue
 import time
 import requests
 
-DELAY=0
-
 @click.command()
 @click.argument('testfile', type=click.Path(exists=True))
 @click.argument('indy_url')
+@click.option('--delay', '-D', help='Delay between starting builds')
 @click.option('--vagrant-dir', '-V', help='The Vagrant environment directory', type=click.Path(exists=True))
-def build(testfile, indy_url, vagrant_dir):
+def build(testfile, indy_url, delay, vagrant_dir):
     with open(testfile) as f:
         build_config = yaml.safe_load(f)
 
     if vagrant_dir is not None:
         vagrant_dir = os.path.abspath(vagrant_dir)
+    else:
+        vagrant_dir = os.path.abspath(os.getcwd())
+
+    if delay is None:
+        delay = 0
+    else:
+        delay = int(delay)
 
     cwd = os.getcwd()
     try:
         project_dir = os.path.abspath(os.path.dirname(testfile))
 
+        mb.vagrant.init_ssh_config(vagrant_dir)
         mb.vagrant.vagrant_env(build_config, 'pre-build', indy_url, vagrant_dir, project_dir)
 
         os.chdir(project_dir)
@@ -47,7 +54,7 @@ def build(testfile, indy_url, vagrant_dir):
 
             for x in range(build['builds']):
                 builddir = mb.util.setup_builddir(project_src_dir, x)
-                build_queue.put((builddir, indy_url, build_config['proxy-port'], (x % int(build['threads']))*DELAY))
+                build_queue.put((builddir, indy_url, build_config['proxy-port'], (x % int(build['threads']))*int(delay)))
 
             build_queue.join()
 
@@ -80,6 +87,7 @@ def check(testfile, indy_url, vagrant_dir=None):
     try:
         project_dir = os.path.abspath(os.path.dirname(testfile))
 
+        mb.vagrant.init_ssh_config(vagrant_dir)
         mb.vagrant.vagrant_env(build_config, 'pre-report', indy_url, vagrant_dir, project_dir)
 
         os.chdir(project_dir)
