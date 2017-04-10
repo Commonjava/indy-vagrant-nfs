@@ -59,14 +59,14 @@ def run_vagrant_commands(section, indy_url):
             if cmd_section.get('wait-for-indy') is True:
                 wait_for_indy(indy_url)
 
-def run_vagrant_copy_ops(section, project_dir):
+def run_vagrant_copy_ops(section, project_dir, output_dir):
     copy_ops = section.get('copy')
     if copy_ops is not None:
         for src in copy_ops:
             dest = copy_ops[src]
-            mb.util.run_cmd(("scp -q -r -F .vagrant/ssh-config %s %s" % (src, dest)).format(project_dir=project_dir), fail=True)
+            mb.util.run_cmd(("scp -q -r -F .vagrant/ssh-config %s %s" % (src, dest)).format(project_dir=project_dir, output_dir=output_dir), fail=True)
 
-def vagrant_env(build_config, env, indy_url, vagrant_dir, project_dir):
+def vagrant_env(build_config, env, indy_url, vagrant_dir, project_dir, output_dir):
     vagrant = build_config.get('vagrant')
     if vagrant is not None:
         cwd = os.getcwd()
@@ -77,7 +77,7 @@ def vagrant_env(build_config, env, indy_url, vagrant_dir, project_dir):
 
             section = vagrant.get(env)
             if section is not None:
-                run_vagrant_copy_ops(section, project_dir)
+                run_vagrant_copy_ops(section, project_dir, output_dir)
                 run_vagrant_commands(section, indy_url)
         finally:
             os.chdir(cwd)
