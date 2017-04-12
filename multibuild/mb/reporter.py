@@ -32,7 +32,7 @@ def verify_report(builddir, url, tracking_id):
 
     print "Writing copy of tracking report: %s" % tracking_id
 
-    input_name = os.path.join(builddir, "%s-report.json" % report_name)
+    input_name = os.path.join(builddir, "tracking-report.json")
     with open(input_name, 'w') as f:
         f.write(json.dumps(report, indent=2))
 
@@ -61,7 +61,7 @@ def verify_report(builddir, url, tracking_id):
 
     print "Writing %s failed entries for tracking report: %s" % (len(result['results']), tracking_id)
 
-    output_name = os.path.join(builddir, "%s-verify.json" % report_name)
+    output_name = os.path.join(builddir, "tracking-verify.json")
     with open(output_name, 'w') as f:
         f.write(json.dumps(result, indent=2))
 

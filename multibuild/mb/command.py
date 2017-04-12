@@ -33,13 +33,14 @@ def build(testfile, indy_url, delay, vagrant_dir):
 
         tid_base = os.path.basename(project_dir)
 
-        mb.vagrant.init_ssh_config(vagrant_dir)
-        mb.vagrant.vagrant_env(build_config, 'pre-build', indy_url, vagrant_dir, project_dir, os.path.join(project_dir, builds_dir))
-
-        os.chdir(project_dir)
-
         build = build_config['build']
         report = build_config['report']
+
+        if build_config.get('vagrant') is not None:
+            mb.vagrant.init_ssh_config(vagrant_dir)
+            mb.vagrant.vagrant_env(build_config, 'pre-build', indy_url, vagrant_dir, project_dir, os.path.join(project_dir, builds_dir))
+
+        os.chdir(project_dir)
 
         project_src_dir = build.get('project-dir') or 'project'
         project_src_dir = os.path.join(os.getcwd(), project_src_dir)
@@ -59,8 +60,9 @@ def build(testfile, indy_url, delay, vagrant_dir):
 
             build_queue.join()
 
-            mb.vagrant.vagrant_env(build_config, 'post-build', indy_url, vagrant_dir, project_dir, builds_dir)
-            mb.vagrant.vagrant_env(build_config, 'pre-report', indy_url, vagrant_dir, project_dir, builds_dir)
+            if build_config.get('vagrant') is not None:
+                mb.vagrant.vagrant_env(build_config, 'post-build', indy_url, vagrant_dir, project_dir, builds_dir)
+                mb.vagrant.vagrant_env(build_config, 'pre-report', indy_url, vagrant_dir, project_dir, builds_dir)
 
             for t in range(int(report['threads'])):
                 thread = mb.reporter.Reporter(report_queue)
@@ -72,7 +74,8 @@ def build(testfile, indy_url, delay, vagrant_dir):
             print e
             print "Quitting."
 
-        mb.vagrant.vagrant_env(build_config, 'post-report', indy_url, vagrant_dir, project_dir, builds_dir)
+        if build_config.get('vagrant') is not None:
+            mb.vagrant.vagrant_env(build_config, 'post-report', indy_url, vagrant_dir, project_dir, builds_dir)
     finally:
         os.chdir(cwd)
 
@@ -93,8 +96,11 @@ def check(testfile, indy_url, vagrant_dir=None):
         if not os.path.isdir(reports_dir):
             os.makedirs(reports_dir)
 
-        mb.vagrant.init_ssh_config(vagrant_dir)
-        mb.vagrant.vagrant_env(build_config, 'pre-report', indy_url, vagrant_dir, project_dir, reports_dir)
+        tid_base = os.path.basename(project_dir)
+
+        if build_config.get('vagrant') is not None:
+            mb.vagrant.init_ssh_config(vagrant_dir)
+            mb.vagrant.vagrant_env(build_config, 'pre-report', indy_url, vagrant_dir, project_dir, reports_dir)
 
         os.chdir(project_dir)
 
@@ -104,6 +110,8 @@ def check(testfile, indy_url, vagrant_dir=None):
 
         try:
             task_ids = mb.reporter.get_sealed_reports(indy_url)
+            task_ids = [tid for tid in task_ids if tid.startswith(tid_base)]
+
             print "\n".join(task_ids)
 
             for t in range(int(report['threads'])):
@@ -124,7 +132,8 @@ def check(testfile, indy_url, vagrant_dir=None):
             print e
             print "Quitting."
 
-        mb.vagrant.vagrant_env(build_config, 'post-report', indy_url, vagrant_dir, project_dir, reports_dir)
+        if build_config.get('vagrant') is not None:
+            mb.vagrant.vagrant_env(build_config, 'post-report', indy_url, vagrant_dir, project_dir, reports_dir)
     finally:
         os.chdir(cwd)
 
