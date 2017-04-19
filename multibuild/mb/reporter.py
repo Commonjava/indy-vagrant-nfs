@@ -27,12 +27,15 @@ def verify_report(builddir, url, tracking_id):
     print "Retrieving tracking report: %s" % tracking_id
 
     report = _pull_folo_report({'url': url, 'id': tracking_id})
+    if report is None:
+        print "Cannot retrieve: %s" % tracking_id
+        return
 
     report_name = os.path.basename(builddir)
 
     print "Writing copy of tracking report: %s" % tracking_id
 
-    input_name = os.path.join(builddir, "%s-report.json" % report_name)
+    input_name = os.path.join(builddir, "tracking-report.json")
     with open(input_name, 'w') as f:
         f.write(json.dumps(report, indent=2))
 
@@ -61,7 +64,7 @@ def verify_report(builddir, url, tracking_id):
 
     print "Writing %s failed entries for tracking report: %s" % (len(result['results']), tracking_id)
 
-    output_name = os.path.join(builddir, "%s-verify.json" % report_name)
+    output_name = os.path.join(builddir, "tracking-verify.json")
     with open(output_name, 'w') as f:
         f.write(json.dumps(result, indent=2))
 
@@ -71,9 +74,12 @@ def _pull_folo_report(params):
     """Pull the Folo tracking report associated with the current build"""
 
     resp = requests.get("%(url)s/api/folo/admin/%(id)s/record" % params)
-    resp.raise_for_status()
-
-    return resp.json()
+    if resp.status_code == 200:
+        return resp.json()
+    elif resp.status_code == 404:
+        return None
+    else:
+        resp.raise_for_status()
 
 def _process_partition(base_url, partition, results, tmp):
     for p in partition:
@@ -93,50 +99,53 @@ def _process_partition(base_url, partition, results, tmp):
 
             print "Checking: %s" % url
 
-            r = requests.get(url, stream=True)
-            if r.status_code != 200:
-                raise Exception("Failed to download: %s" % url)
+            try:
+                r = requests.get(url, stream=True)
+                if r.status_code != 200:
+                    raise Exception("Failed to download: %s" % url)
 
-            print "Getting size header for: %s" % url
-            header_size=int(r.headers['content-length'])
+                print "Getting size header for: %s" % url
+                header_size=int(r.headers['content-length'])
 
-            print "Preparing temp directory for writing to disk: %s, using temp base: %s and path: %s" % (url, tmp, path)
-            dest = os.path.join(tmp, path)
-            print "Calculating dir of: %s" % dest
-            destdir = os.path.dirname(dest)
-            print "Calculated temp dir as: %s" % destdir
-            if not os.path.isdir(destdir):
-                print "Creating directory: %s" % destdir
-                os.makedirs(destdir)
+                print "Preparing temp directory for writing to disk: %s, using temp base: %s and path: %s" % (url, tmp, path)
+                dest = os.path.join(tmp, path)
+                print "Calculating dir of: %s" % dest
+                destdir = os.path.dirname(dest)
+                print "Calculated temp dir as: %s" % destdir
+                if not os.path.isdir(destdir):
+                    print "Creating directory: %s" % destdir
+                    os.makedirs(destdir)
 
-            print "Writing to disk: %s" % url
-            with open(dest, 'wb') as f:
-                #r.raw.decode_content = True
-                shutil.copyfileobj(r.raw, f)
+                print "Writing to disk: %s" % url
+                with open(dest, 'wb') as f:
+                    #r.raw.decode_content = True
+                    shutil.copyfileobj(r.raw, f)
 
-            print "Checking written size against report record for: %s" % url
-            entry_data = {'path': path, 'local_url': url, 'type':p['dataset']}
+                print "Checking written size against report record for: %s" % url
+                entry_data = {'path': path, 'local_url': url, 'type':p['dataset']}
 
-            dest_sz = os.path.getsize(dest)
-            if entry['size'] != dest_sz or entry['size'] != header_size or dest_sz != header_size:
-                entry_data['size'] = {'success': False, 'record': entry['size'], 'header': header_size, 'calculated': dest_sz}
-            else:
-                entry_data['size'] = {'success': True}
+                dest_sz = os.path.getsize(dest)
+                if entry['size'] != dest_sz or entry['size'] != header_size or dest_sz != header_size:
+                    entry_data['size'] = {'success': False, 'record': entry['size'], 'header': header_size, 'calculated': dest_sz}
+                else:
+                    entry_data['size'] = {'success': True}
 
-            print "Calculating checksums for: %s" % url
-            _compare_checksum('md5', url, dest, entry, entry_data)
-            _compare_checksum('sha1', url, dest, entry, entry_data)
-            # compare_checksum('sha256', url, dest, entry, entry_data)
+                print "Calculating checksums for: %s" % url
+                _compare_checksum('md5', url, dest, entry, entry_data)
+                _compare_checksum('sha1', url, dest, entry, entry_data)
+                # compare_checksum('sha256', url, dest, entry, entry_data)
 
-            append=False
-            for k in ['size', 'md5', 'sha1']:
-                if entry_data[k]['success'] is False:
-                    print "FAIL: %s" % url
-                    append = True
-                    break
+                append=False
+                for k in ['size', 'md5', 'sha1']:
+                    if entry_data[k]['success'] is False:
+                        print "FAIL: %s" % url
+                        append = True
+                        break
 
-            if append is True:
-                results.append(entry_data)
+                if append is True:
+                    results.append(entry_data)
+            except:
+                print "Failed to download: %s" % url
 
     return results
 
@@ -168,7 +177,7 @@ class Reporter(Thread):
             try:
                 (builddir, url, tracking_id) = self.queue.get()
                 verify_report(builddir, url, tracking_id)
-            except Exception as e:
+            except (KeyboardInterrupt,SystemExit,Exception) as e:
                 print e
                 break
             finally:

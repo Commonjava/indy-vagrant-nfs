@@ -75,7 +75,7 @@ SETTINGS = """
 </settings>
 """
 
-POST_HEADERS = {'content-type': 'application/json'}
+POST_HEADERS = {'content-type': 'application/json', 'accept': 'application/json'}
 
 class Builder(Thread):
     def __init__(self, queue, reports):
@@ -101,16 +101,76 @@ class Builder(Thread):
                 self.seal_folo_report(params)
                 self.reports.put((builddir,params['url'], params['id']))
 
-            except KeyboardInterrupt:
-                print "Keyboard interrupt in process: ", process_number
+                folo_report = self._pull_folo_report(params)
+                self.promote_by_path(folo_report, params)
+
+                self.cleanup_build_group(params)
+
+                self.promote_by_group(params)
+
+            except (KeyboardInterrupt,SystemExit,Exception) as e:
+                print e
                 break
             finally:
                 self.queue.task_done()
 
+    def promote_by_path(self, folo_report, params):
+        """Run by-path promotion of downloaded content"""
+        to_promote = {}
+
+        downloads = folo_report.get('downloads')
+        if downloads is not None:
+          for download in downloads:
+            key = download['storeKey']
+            mode = download['accessChannel']
+            if mode == 'MAVEN_REPO' and key.startswith('remote:'):
+              path = download['path']
+
+              paths = to_promote.get(key)
+              if paths is None:
+                paths = []
+                to_promote[key]=paths
+
+              paths.append(path)
+
+        print "Promoting dependencies from %s sources into hosted:shared-imports" % len(to_promote.keys())
+        for key in to_promote:
+          req = {'source': key, 'target': 'hosted:shared-imports', 'paths': to_promote[key]}
+          resp = requests.post("%(url)s/api/promotion/paths/promote" % params, json=req, headers=POST_HEADERS)
+          resp.raise_for_status()
+
+    def promote_by_group(self, params):
+        """Run by-group promotion of uploaded content"""
+
+        print "Promoting build output in hosted:%(id)s to membership of group:builds" % params
+        req = {'source': 'hosted:%(id)s' % params, 'targetGroup': 'builds'}
+        resp = requests.post("%(url)s/api/promotion/groups/promote" % params, json=req, headers=POST_HEADERS)
+        resp.raise_for_status()
+
+
+    def _pull_folo_report(self, params):
+        """Pull the Folo tracking report associated with the current build"""
+
+        print "Retrieving folo tracking report for: %(id)s" % params
+        resp = requests.get("%(url)s/api/folo/admin/%(id)s/record" % params)
+        resp.raise_for_status()
+
+        return resp.json()
+
     def seal_folo_report(self, params):
         """Seal the Folo tracking report after the build completes"""
 
+        print "Sealing folo tracking report for: %(id)s" % params
         resp = requests.post("%(url)s/api/folo/admin/%(id)s/record" % params, data={})
+        resp.raise_for_status()
+
+    def cleanup_build_group(self, params):
+        """Remove the group created specifically to channel content into this build,
+           since we're done with it now.
+        """
+
+        print "Deleting temporary group:%(id)s used for build time only" % params
+        resp = requests.delete("%(url)s/api/admin/group/%(id)s" % params)
         resp.raise_for_status()
 
     def build(self, builddir):
@@ -120,6 +180,55 @@ class Builder(Thread):
         """Create the hosted repo and group, then pull the Indy-generated Maven
            settings.xml file tuned to that group."""
 
+        params['shared_name'] = 'shared-imports'
+        params['builds_name'] = 'builds'
+        params['brew_proxies'] = 'brew_proxies'
+
+        # Create the shared-imports hosted repo if necessary
+        resp = requests.head('%(url)s/api/admin/hosted/%(shared_name)s' % params)
+        if resp.status_code == 404:
+          shared = {
+              'type': 'hosted', 
+              'key': "hosted:%(shared_name)s" % params, 
+              'disabled': False, 
+              'doctype': 'hosted', 
+              'name': params['shared_name'], 
+              'allow_releases': True
+          }
+
+          print "POSTing: %s" % json.dumps(shared, indent=2)
+
+          resp = requests.post("%(url)s/api/admin/hosted" % params, json=shared, headers=POST_HEADERS)
+          resp.raise_for_status()
+
+        # Create the builds group if necessary
+        resp = requests.head('%(url)s/api/admin/group/%(builds_name)s' % params)
+        if resp.status_code == 404:
+          builds_group = {
+              'type': 'group', 
+              'key': "group:%(builds_name)s" % params, 
+              'disabled': False, 
+              'doctype': 'group', 
+              'name': params['builds_name'], 
+          }
+
+        # Create the builds group if necessary
+        resp = requests.head('%(url)s/api/admin/group/%(brew_proxies)s' % params)
+        if resp.status_code == 404:
+          brew_proxies = {
+              'type': 'group', 
+              'key': "group:%(brew_proxies)s" % params, 
+              'disabled': False, 
+              'doctype': 'group', 
+              'name': params['brew_proxies'], 
+          }
+
+          print "POSTing: %s" % json.dumps(brew_proxies, indent=2)
+
+          resp = requests.post("%(url)s/api/admin/group" % params, json=brew_proxies, headers=POST_HEADERS)
+          resp.raise_for_status()
+
+        # Create the hosted repo for this build
         hosted = {
             'type': 'hosted', 
             'key': "hosted:%(id)s" % params, 
@@ -134,6 +243,7 @@ class Builder(Thread):
         resp = requests.post("%(url)s/api/admin/hosted" % params, json=hosted, headers=POST_HEADERS)
         resp.raise_for_status()
 
+        # Create the group for this build
         group = {
             'type': 'group', 
             'key': "group:%(id)s" % params, 
@@ -142,6 +252,9 @@ class Builder(Thread):
             'name': params['id'], 
             'constituents': [
                 "hosted:%(id)s" % params, 
+                'group:builds',
+                'group:brew_proxies',
+                'hosted:shared-imports',
                 'group:public'
             ]
         }
@@ -151,5 +264,6 @@ class Builder(Thread):
         resp = requests.post("%(url)s/api/admin/group" % params, json=group, headers=POST_HEADERS)
         resp.raise_for_status()
 
+        # Write the settings.xml we need for this build
         with open("%s/settings.xml" % builddir, 'w') as f:
             f.write(SETTINGS % params)
