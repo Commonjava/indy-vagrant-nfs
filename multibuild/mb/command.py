@@ -31,7 +31,7 @@ def build(testfile, indy_url, delay, vagrant_dir):
         project_dir = os.path.abspath(os.path.dirname(testfile))
         builds_dir = "builds-%s" % dt.now().strftime("%Y%m%dT%H%M%S")
 
-        tid_base = os.path.basename(project_dir)
+        tid_base = "build_%s" % os.path.basename(project_dir)
 
         build = build_config['build']
         report = build_config['report']
@@ -45,6 +45,8 @@ def build(testfile, indy_url, delay, vagrant_dir):
         project_src_dir = build.get('project-dir') or 'project'
         project_src_dir = os.path.join(os.getcwd(), project_src_dir)
 
+        git_branch = build.get('git-branch') or 'master'
+
         build_queue = Queue()
         report_queue = Queue()
 
@@ -55,7 +57,7 @@ def build(testfile, indy_url, delay, vagrant_dir):
                 thread.start()
 
             for x in range(build['builds']):
-                builddir = mb.util.setup_builddir(builds_dir, project_src_dir, tid_base, x)
+                builddir = mb.util.setup_builddir(builds_dir, project_src_dir, git_branch, tid_base, x)
                 build_queue.put((builddir, indy_url, build_config['proxy-port'], (x % int(build['threads']))*int(delay)))
 
             build_queue.join()
@@ -82,8 +84,9 @@ def build(testfile, indy_url, delay, vagrant_dir):
 @click.command()
 @click.argument('testfile', type=click.Path(exists=True))
 @click.argument('indy_url')
+@click.option('--scan-dirs', '-S', help='Scan builds* subdirectories to get the tracking IDs to pull', is_flag=True, default=False)
 @click.option('--vagrant-dir', '-V', help='The Vagrant environment directory', type=click.Path(exists=True))
-def check(testfile, indy_url, vagrant_dir=None):
+def check(testfile, indy_url, scan_dirs=False, vagrant_dir=None):
     with open(testfile) as f:
         build_config = yaml.safe_load(f)
 
@@ -96,7 +99,7 @@ def check(testfile, indy_url, vagrant_dir=None):
         if not os.path.isdir(reports_dir):
             os.makedirs(reports_dir)
 
-        tid_base = os.path.basename(project_dir)
+        tid_base = "build_%s" % os.path.basename(project_dir)
 
         if build_config.get('vagrant') is not None:
             mb.vagrant.init_ssh_config(vagrant_dir)
@@ -109,8 +112,17 @@ def check(testfile, indy_url, vagrant_dir=None):
         report_queue = Queue()
 
         try:
-            task_ids = mb.reporter.get_sealed_reports(indy_url)
-            task_ids = [tid for tid in task_ids if tid.startswith(tid_base)]
+            if scan_dirs is True:
+                task_ids = []
+                for builds_cand in os.listdir(project_dir):
+                    if builds_cand.startswith("builds"):
+                        for tid in os.listdir(os.path.join(project_dir, builds_cand)):
+                            if tid.startswith(tid_base):
+                                task_ids.append(tid)
+
+            else:
+                task_ids = mb.reporter.get_sealed_reports(indy_url)
+                task_ids = [tid for tid in task_ids if tid.startswith(tid_base)]
 
             print "\n".join(task_ids)
 
